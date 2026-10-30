@@ -88,7 +88,7 @@ tr[style*="background"] td{background:inherit}
 <main id="app"></main>
 
 <script>window.F1_STATIC=true</script>
-<script src="seasons.js?v=8ea99bed"></script>
+<script src="seasons.js?v=4e110ffc"></script>
 <script src="events.js?v=9085e548"></script>
 <script src="car.js?v=cc4addd3"></script>
 <script src="telemetry.js?v=4dfa07dc"></script>
@@ -186,7 +186,8 @@ function sessTable(ss){
   for(const s of ss){const k=s.weekend&&s.weekend!=='0'?s.weekend:null;
     if(k&&byKey[k]){byKey[k].push(s);continue}const g=[s];groups.push(g);if(k)byKey[k]=g}
   const row=g=>{const s=g[0];if(g.length===1)return `<tr class="click" onclick="location.hash='#/session/${s.uid}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td>${esc(s.type)}${window.modeBadge(s)}<td>${s.laps}<td class="${s.best?'p':''}">${fmt(s.best)}`;
-    const types=[...g].reverse().map(x=>x.type.replace('One-Shot Qualifying','Квал.').replace('Short Qualifying','Квал.')).join(' · '), best=min(g.map(x=>x.best).filter(Boolean));
+    const short=t=>t.replace('One-Shot Qualifying','Квал.').replace('Short Qualifying','Квал.').replace(/^Sprint Shootout (\d)$/,'SQ$1').replace(/^Sprint$/,'Спринт');
+    const types=[...g].reverse().map(x=>short(x.type)).join(' · '), best=min(g.map(x=>x.best).filter(Boolean));
     return `<tr class="click" onclick="location.hash='#/weekend/${encodeURIComponent(s.weekend)}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td><b>Уикенд</b> <span style="color:var(--mute)">${esc(types)}</span>${window.modeBadge(s)}<td>${g.reduce((a,x)=>a+x.laps,0)}<td class="${best?'p':''}">${fmt(best)}`};
   return `<div class="panel"><table><thead><tr><th>Дата<th>Трасса<th>Тип<th>Кругов<th>Лучший</tr></thead><tbody>${groups.map(row).join('')}</tbody></table></div>`;
 }

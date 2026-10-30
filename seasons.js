@@ -4,7 +4,7 @@ const ROLES={race:'Гонка',sprint:'Спринт',quali:'Квалификац
 const STATUS={3:'',4:'DNF',5:'DSQ',6:'NC',7:'DNS'};
 const STATUS_IN={'':3,dnf:4,dsq:5,nc:6,dns:7,ret:7};
 const TRACK_NAMES=['Melbourne','Paul Ricard','Shanghai','Sakhir','Barcelona','Monaco','Montreal','Silverstone','Hockenheim','Hungaroring','Spa','Monza','Singapore','Suzuka','Abu Dhabi','Austin','Interlagos','Spielberg','Sochi','Mexico City','Baku','Zandvoort','Imola','Portimao','Jeddah','Miami','Las Vegas','Lusail','Madrid'];
-const SESSION_TYPES=['Race','Race 2','Q1','Q2','Q3','Short Qualifying','Sprint Shootout 1','Practice 1','Practice 2','Practice 3'];
+const SESSION_TYPES=['Race','Sprint','Race 2','Q1','Q2','Q3','Short Qualifying','Sprint Shootout 1','Practice 1','Practice 2','Practice 3'];
 
 const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
 const del=u=>fetch(u,{method:'DELETE'});
@@ -55,7 +55,7 @@ window.sessionExtras=async function(s){
     $('#m-save').onclick=async()=>{await post('/api/results_update',{uid:s.uid,results:parseResults($('#m-text').value,res)});refresh()};
   };
 };
-function autoRole(t){return t.startsWith('Race')?'race':t.includes('Shootout')?'sq':['Q1','Q2','Q3','Short Qualifying','One-Shot Qualifying'].includes(t)?'quali':t.includes('Practice')?'practice':'other'}
+function autoRole(t){return t==='Sprint'?'sprint':t.startsWith('Race')?'race':t.includes('Shootout')?'sq':['Q1','Q2','Q3','Short Qualifying','One-Shot Qualifying'].includes(t)?'quali':t.includes('Practice')?'practice':'other'}
 
 /* ---------- список сессий с вкладками по режимам ---------- */
 let modeTab='all';
@@ -121,12 +121,20 @@ function seasonEvents(d){
 }
 const fmtRace=t=>{if(!t)return'—';const h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=(t%60).toFixed(3).padStart(6,'0');return h?`${h}:${String(m).padStart(2,'0')}:${s}`:`${m}:${s}`};
 function eventTable(r,kind){
-  const ses=r?r.sessions.filter(s=>s.role_final===kind&&s.results.length):[];
-  if(!ses.length) return `<div class="empty" style="padding:26px">${!r?'Этап ещё не проведён':kind==='race'?'Итогов гонки нет':kind==='sprint'?'Спринта не было':'Итогов квалификации нет'}</div>`;
+  const QO={...Q_ORDER,...SQ_ORDER};
+  const ses=r?r.sessions.filter(s=>s.role_final===kind&&s.results.length).sort((a,b)=>(QO[a.type]||0)-(QO[b.type]||0)||a.started-b.started):[];
+  if(!ses.length) return `<div class="empty" style="padding:26px">${!r?'Этап ещё не проведён':kind==='race'?'Итогов гонки нет':kind==='sprint'||kind==='sq'?'Спринта на этом этапе не было':'Итогов квалификации нет'}</div>`;
+  if(kind==='quali'||kind==='sq'){
+    // итог по всем сегментам: место в последнем сегменте, где пилот участвовал (Q3, иначе Q2, иначе Q1)
+    const D={};ses.forEach((s,si)=>s.results.forEach(r=>{const d=D[r.display]??={...r,seg:-1};if(si>=d.seg)Object.assign(d,r,{seg:si})}));
+    const res=Object.values(D).sort((a,b)=>b.seg-a.seg||a.pos-b.pos).map((x,i)=>({...x,pos:i+1}));
+    const fl=Math.min(...res.map(x=>x.best_ms).filter(Boolean)),win=res[0];
+    const segName=x=>ses.length>1?`<span class="tag" style="margin-left:6px">${esc(qLabel(ses[x.seg].type))}</span>`:'';
+    return `<table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Лучший круг<th>Отставание${kind==='quali'?'<th>Старт в гонке':''}</tr></thead><tbody>
+    ${res.map(x=>`<tr style="${x.me?'background:rgba(52,113,233,.28)':''}"><td class="pos${x.pos}">${x.pos}<td>${esc(x.display)}${x.ai?'<span class="tag">бот</span>':''}<td>${esc(x.team)}<td class="${x.best_ms===fl?'p':''}">${fmt(x.best_ms)}${segName(x)}<td>${x.pos===1||!x.best_ms||!win.best_ms||x.seg!==win.seg?'—':'+'+((x.best_ms-win.best_ms)/1e3).toFixed(3)}${kind==='quali'?`<td>${x.start_grid?startCell(x):'—'}`:''}`).join('')}</tbody></table>`;
+  }
   const res=ses[ses.length-1].results, win=res.find(x=>x.pos===1)||res[0];
   const fl=Math.min(...res.map(x=>x.best_ms).filter(Boolean));
-  if(kind==='quali') return `<table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Лучший круг<th>Отставание<th>Старт в гонке</tr></thead><tbody>
-    ${res.map(x=>`<tr style="${x.me?'background:rgba(52,113,233,.28)':''}"><td class="pos${x.pos}">${x.pos}<td>${esc(x.display)}${x.ai?'<span class="tag">бот</span>':''}<td>${esc(x.team)}<td class="${x.best_ms===fl?'p':''}">${fmt(x.best_ms)}<td>${x.pos===1||!x.best_ms||!win.best_ms?'—':'+'+((x.best_ms-win.best_ms)/1e3).toFixed(3)}<td>${x.start_grid?startCell(x):'—'}`).join('')}</tbody></table>`;
   const time=x=>STATUS[x.status]||(x.pos===1?fmtRace(x.time_s):x.laps<win.laps?`+${win.laps-x.laps} кр.`:x.time_s&&win.time_s?'+'+(x.time_s-win.time_s).toFixed(3):'—');
   return `<table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Старт<th>Лучший круг<th>Время<th>Штраф<th>Очки</tr></thead><tbody>
     ${res.map(x=>`<tr style="${x.me?'background:rgba(52,113,233,.28)':''}"><td class="pos${x.pos}">${x.pos}<td>${esc(x.display)}${x.ai?'<span class="tag">бот</span>':''}<td>${esc(x.team)}<td>${startCell(x)}<td class="${x.best_ms===fl?'p':''}">${fmt(x.best_ms)}<td>${time(x)}<td>${x.penalty_s?'+'+x.penalty_s+' с':'—'}<td><b>${x.points||0}</b>`).join('')}</tbody></table>`;
@@ -160,6 +168,23 @@ async function seasonsPage(){
 
 let sKind='race',sStand='drivers',sMatrix=false,hideBots=false,sEv=null,sEvSeason=null,sSettings=false;
 const posCls=i=>i===0?'p':'';
+/* «Положение в чемпионате»: личный и командный зачёт рядом — главная таблица сезона */
+function overallHTML(d){
+  if(!d.drivers.length) return '';
+  const lead=d.drivers[0].points, tlead=d.teams[0]?.points||0;
+  const gap=(p,l)=>p===l?'—':'−'+(l-p);
+  const humanTeams=new Set(d.drivers.filter(x=>!x.ai).map(x=>x.team));
+  return `<h2 style="margin-top:8px">Положение в чемпионате</h2>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start">
+    <div><div style="font:700 15px var(--display);color:var(--peri);margin:0 0 6px">Личный зачёт</div>
+    <div style="overflow:auto"><table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Очки<th>Отрыв</tr></thead><tbody>
+    ${d.drivers.map((x,i)=>`<tr style="${x.me?'background:rgba(52,113,233,.28)':!x.ai?'background:rgba(255,71,71,.10)':''}"><td class="pos${i+1}">${i+1}<td><b>${esc(x.name)}</b>${x.me?'<span class="tag pb">я</span>':x.ai?'':'<span class="tag">игрок</span>'}<td>${esc(x.team)}<td class="${i?'':'p'}"><b>${x.points}</b><td style="color:var(--mute)">${gap(x.points,lead)}`).join('')}</tbody></table></div></div>
+    <div><div style="font:700 15px var(--display);color:var(--peri);margin:0 0 6px">Командный зачёт</div>
+    <div style="overflow:auto"><table><thead><tr><th>Поз.<th>Команда<th>Пилоты<th>Очки<th>Отрыв</tr></thead><tbody>
+    ${d.teams.map((t,i)=>`<tr style="${humanTeams.has(t.name)?'background:rgba(255,71,71,.10)':''}"><td class="pos${i+1}">${i+1}<td><b>${esc(t.name)}</b><td style="white-space:normal">${t.drivers.map(esc).join(', ')}<td class="${i?'':'p'}"><b>${t.points}</b><td style="color:var(--mute)">${gap(t.points,tlead)}`).join('')}</tbody></table></div></div>
+  </div>`;
+}
+
 async function seasonPage(id){
   const d=await api('/api/season?id='+id);
   if(d.error){app.innerHTML='<div class="empty">Сезон не найден</div>';return}
@@ -218,12 +243,13 @@ async function seasonPage(id){
   ${edit}
   <div class="lg-box"><div class="lg-title"><b>${esc(S.name)}</b><span>${planned?`Этап ${Math.min(done+1,planned)} из ${planned}`:`${R.length} этапов`}</span></div>
   <div class="lg-in">
+    ${overallHTML(d)}
     <h2>Результаты</h2>
-    <div style="text-align:center;margin-bottom:14px"><div class="seg">${[['race','Гонка'],...(hasSprint?[['sprint','Спринт']]:[]),['quali','Квалификация']].map(([k,t])=>`<button data-k="${k}" class="${sKind===k?'on':''}">${t}</button>`).join('')}</div></div>
+    <div style="text-align:center;margin-bottom:14px"><div class="seg">${[['race','Гонка'],...(hasSprint?[['sprint','Спринт'],['sq','Спринт-квал.']]:[]),['quali','Квалификация']].map(([k,t])=>`<button data-k="${k}" class="${sKind===k?'on':''}">${t}</button>`).join('')}</div></div>
     ${evs.length?`<div class="evs">${evs.map((e,i)=>{const [cn,col]=tinfo(e.track),[stt,stc]=EV_STATUS[e.status];
       return `<div class="ev ${i===sEv?'on':''}" data-ev="${i}"><div class="art" style="background:linear-gradient(135deg,${col},#14162a)">
         <span class="t">${esc(e.track)}</span><span class="n">${e.n}</span><span class="status ${stc}">${stt}</span></div>
-        <div class="cap"><b>${esc(cn)}</b><span>${e.round?e.round.date:'Multiplayer'}</span></div></div>`}).join('')}</div>`
+        <div class="cap"><b>${esc(cn)}</b><span>${e.round?e.round.date:'Multiplayer'}${e.round&&e.round.sprint?' · <b style="display:inline;font:inherit;color:#ffd23f">Спринт</b>':''}</span></div></div>`}).join('')}</div>`
       :'<div class="empty">Добавьте календарь в настройках сезона или проведите первую гонку</div>'}
     ${ev?`<div style="overflow:auto">${eventTable(ev.round,sKind)}</div>${ev.round&&(ev.round.pole||ev.round.winner)?`<div class="bar" style="margin-top:8px">${ev.round.pole?`<span class="chip">Поул: ${esc(ev.round.pole)}</span>`:''}${ev.round.winner?`<span class="chip">Победа: ${esc(ev.round.winner)}</span>`:''}</div>`:''}${roundTools}`:''}
 
@@ -285,7 +311,9 @@ async function newSessionPage(seasonId){
 
 /* ---------- уикенд: квалификация Q1–Q3 + гонка как одно событие ---------- */
 const Q_ORDER={'Q1':1,'Q2':2,'Q3':3,'Short Qualifying':3,'One-Shot Qualifying':3};
-const qLabel=t=>({'Short Qualifying':'Квал.','One-Shot Qualifying':'Один круг'}[t]||t);
+const SQ_ORDER={'Sprint Shootout 1':1,'Sprint Shootout 2':2,'Sprint Shootout 3':3,'Short Sprint Shootout':3,'One-Shot Sprint Shootout':3};
+const qLabel=t=>({'Short Qualifying':'Квал.','One-Shot Qualifying':'Один круг','Sprint Shootout 1':'SQ1','Sprint Shootout 2':'SQ2',
+  'Sprint Shootout 3':'SQ3','Short Sprint Shootout':'Спринт-квал.','One-Shot Sprint Shootout':'SQ один круг','Sprint':'Спринт'}[t]||t);
 const hasWeekend=s=>s.weekend&&s.weekend!=='0';
 
 // блок «Уикенд» на странице сессии: ссылка на уикенд, присоединить к другим сессиям, отделить
@@ -307,39 +335,47 @@ async function weekendBlock(s){
 async function weekendPage(key){
   const ws=await api('/api/weekend?key='+enc(key));
   if(!ws.length){app.innerHTML='<div class="empty">Уикенд не найден</div>';return}
-  const quali=ws.filter(s=>Q_ORDER[s.type]&&s.results.length).sort((a,b)=>Q_ORDER[a.type]-Q_ORDER[b.type]||a.started-b.started);
+  const byOrder=o=>ws.filter(s=>o[s.type]&&s.results.length).sort((a,b)=>o[a.type]-o[b.type]||a.started-b.started);
+  const quali=byOrder(Q_ORDER), shoot=byOrder(SQ_ORDER);
   const races=ws.filter(s=>s.type.startsWith('Race')&&s.results.length);
   const race=races.length?races.reduce((a,b)=>(b.total_laps||0)>=(a.total_laps||0)?b:a):null;  // основная гонка
-  const first=ws[0];
-  // сводная квалификация: время в каждом сегменте, итог — место в последнем сегменте, где пилот участвовал
-  const D={};
-  quali.forEach((s,si)=>s.results.forEach(r=>{const d=D[r.name]??={name:r.name,team:r.team,ai:r.ai,me:0,t:{},seg:-1,segPos:99};
-    d.t[si]=r.best_ms;d.me=d.me||r.me;if(si>=d.seg){d.seg=si;d.segPos=r.pos;d.start_grid=r.start_grid;d.grid_penalty=r.grid_penalty;d.quali_final=r.quali_final;d.grid=r.grid}}));
-  const qrows=Object.values(D).sort((a,b)=>b.seg-a.seg||a.segPos-b.segPos);
-  const qBest=quali.map((s,si)=>Math.min(...qrows.map(d=>d.t[si]).filter(Boolean)));
-  const meQ=qrows.findIndex(d=>d.me), meR=race?race.results.find(r=>r.me):null;
-  const card=(k,v,extra='')=>`<div class="card"><div class="k">${k}</div><div class="v">${v??'—'}</div>${extra}</div>`;
+  // спринт: сессия «Sprint», а у старых записей без структуры уикенда — более короткая из двух гонок
+  const sprint=ws.find(s=>s.type==='Sprint'&&s.results.length)||(races.length>1?races.find(s=>s!==race):null);
+  const main=race||sprint, first=ws[0];
   const hl=me=>me?' style="background:rgba(52,113,233,.28)"':'';
-  const win=race?race.results.find(r=>r.pos===1):null, fl=race?Math.min(...race.results.map(r=>r.best_ms).filter(Boolean)):0;
-  const rtime=x=>STATUS[x.status]||(x.pos===1?fmtRace(x.time_s):x.laps<win.laps?`+${win.laps-x.laps} кр.`:x.time_s&&win.time_s?'+'+(x.time_s-win.time_s).toFixed(3):'—');
+  // сводная квалификация: время в каждом сегменте, итог — место в последнем сегменте, где пилот участвовал
+  const summary=list=>{const D={};
+    list.forEach((s,si)=>s.results.forEach(r=>{const d=D[r.name]??={name:r.name,team:r.team,ai:r.ai,me:0,t:{},seg:-1,segPos:99};
+      d.t[si]=r.best_ms;d.me=d.me||r.me;if(si>=d.seg){d.seg=si;d.segPos=r.pos;d.start_grid=r.start_grid;d.grid_penalty=r.grid_penalty;d.quali_final=r.quali_final;d.grid=r.grid}}));
+    const rows=Object.values(D).sort((a,b)=>b.seg-a.seg||a.segPos-b.segPos);
+    return {rows,best:list.map((s,si)=>Math.min(...rows.map(d=>d.t[si]).filter(Boolean)))}};
+  const qualiTable=(list,title,grid)=>{if(!list.length)return '';const {rows,best}=summary(list);
+    return `<h2>${title}</h2><div class="panel wk"><table><thead><tr><th>Поз.<th>Пилот<th>Команда${list.map(s=>`<th>${esc(qLabel(s.type))}`).join('')}${grid?'<th>Старт в гонке':''}</tr></thead><tbody>
+    ${rows.map((d,i)=>`<tr${hl(d.me)}><td class="pos${i+1}">${i+1}<td>${esc(d.name)}${d.me?'<span class="tag pb">я</span>':d.ai?'':'<span class="tag">игрок</span>'}<td>${esc(d.team)}
+      ${list.map((s,si)=>`<td class="${d.t[si]&&d.t[si]===best[si]?'p':''}" style="${si>d.seg?'color:var(--mute)':''}">${d.t[si]?fmt(d.t[si]):si>d.seg?'':'—'}`).join('')}
+      ${grid?`<td>${d.start_grid?startCell(d):'—'}`:''}`).join('')}</tbody></table></div>`};
+  const resultTable=(s,title)=>{if(!s)return '';const win=s.results.find(r=>r.pos===1)||s.results[0],fl=Math.min(...s.results.map(r=>r.best_ms).filter(Boolean));
+    const rtime=x=>STATUS[x.status]||(x.pos===1?fmtRace(x.time_s):x.laps<win.laps?`+${win.laps-x.laps} кр.`:x.time_s&&win.time_s?'+'+(x.time_s-win.time_s).toFixed(3):'—');
+    return `<h2>${title}</h2><div class="panel wk"><table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Старт<th>Лучший круг<th>Время<th>Штраф</tr></thead><tbody>
+    ${s.results.map(x=>`<tr${hl(x.me)}><td class="pos${x.pos}">${x.pos}<td>${esc(x.name)}${x.me?'<span class="tag pb">я</span>':x.ai?'':'<span class="tag">игрок</span>'}<td>${esc(x.team)}<td>${startCell(x)}<td class="${x.best_ms===fl?'p':''}">${fmt(x.best_ms)}<td>${rtime(x)}<td>${x.penalty_s?'+'+x.penalty_s+' с':'—'}`).join('')}</tbody></table></div>
+    <div class="bar" style="margin-top:10px"><a href="#/session/${s.uid}" class="chip" style="text-decoration:none">Круги, темп соперников, стратегия и износ шин — на странице сессии ›</a></div>`};
+  const Q=quali.length?quali:shoot, qs=summary(Q), meQ=qs.rows.findIndex(d=>d.me), meR=main?main.results.find(r=>r.me):null;
+  const card=(k,v,extra='')=>`<div class="card"><div class="k">${k}</div><div class="v">${v??'—'}</div>${extra}</div>`;
   app.innerHTML=`<span class="back" onclick="history.back()">← назад</span>
-  <h1>${esc(first.track)} <span class="tag">уикенд</span></h1>
+  <h1>${esc(first.track)} <span class="tag">${sprint?'спринт-уикенд':'уикенд'}</span></h1>
   <div class="sub">${fmtD(first.started)} · ${window.modeBadge(first)}</div>
   <div class="bar">${ws.map(s=>`<a href="#/session/${s.uid}" class="chip" style="text-decoration:none">${esc(qLabel(s.type))} ›</a>`).join('')}</div>
   ${meQ>=0||meR?`<div class="cards">
-    ${card('Квалификация',meQ>=0?`P${meQ+1}`:'—',meQ>=0?`<div class="sub" style="margin:2px 0 0">${esc(qLabel(quali[qrows[meQ].seg].type))}</div>`:'')}
+    ${card(quali.length?'Квалификация':'Спринт-квалификация',meQ>=0?`P${meQ+1}`:'—',meQ>=0?`<div class="sub" style="margin:2px 0 0">${esc(qLabel(Q[qs.rows[meQ].seg].type))}</div>`:'')}
     ${card('Старт',meR?`P${meR.grid}`:'—',meR&&meR.grid_penalty>0?`<div style="margin-top:4px"><span class="tag inv">штраф +${meR.grid_penalty} поз.</span></div>`:'')}
-    ${card('Финиш',meR?(STATUS[meR.status]||`P${meR.pos}`):'—')}
+    ${card(race?'Финиш':'Финиш спринта',meR?(STATUS[meR.status]||`P${meR.pos}`):'—')}
     ${card('Отыграно',meR&&meR.grid&&meR.status===3?((meR.grid-meR.pos>0?'+':'')+(meR.grid-meR.pos)):'—')}
-    ${card('Лучший круг гонки',meR?fmt(meR.best_ms):'—')}</div>`:''}
-  ${quali.length?`<h2>Квалификация</h2><div class="panel wk"><table><thead><tr><th>Поз.<th>Пилот<th>Команда${quali.map(s=>`<th>${esc(qLabel(s.type))}`).join('')}<th>Старт в гонке</tr></thead><tbody>
-    ${qrows.map((d,i)=>`<tr${hl(d.me)}><td class="pos${i+1}">${i+1}<td>${esc(d.name)}${d.me?'<span class="tag pb">я</span>':d.ai?'':'<span class="tag">игрок</span>'}<td>${esc(d.team)}
-      ${quali.map((s,si)=>`<td class="${d.t[si]&&d.t[si]===qBest[si]?'p':''}" style="${si>d.seg?'color:var(--mute)':''}">${d.t[si]?fmt(d.t[si]):si>d.seg?'':'—'}`).join('')}
-      <td>${d.start_grid?startCell(d):'—'}`).join('')}</tbody></table></div>
-    <div class="sub" style="margin-top:8px">Итог квалификации — место в последнем сегменте, где пилот участвовал. «Старт в гонке» и штраф считаются по стартовой позиции из итогов гонки.</div>`:''}
-  ${race?`<h2>Гонка${races.length>1?` <span class="tag">ещё ${races.length-1} гонка (спринт)</span>`:''}</h2><div class="panel wk"><table><thead><tr><th>Поз.<th>Пилот<th>Команда<th>Старт<th>Лучший круг<th>Время<th>Штраф</tr></thead><tbody>
-    ${race.results.map(x=>`<tr${hl(x.me)}><td class="pos${x.pos}">${x.pos}<td>${esc(x.name)}${x.me?'<span class="tag pb">я</span>':''}<td>${esc(x.team)}<td>${startCell(x)}<td class="${x.best_ms===fl?'p':''}">${fmt(x.best_ms)}<td>${rtime(x)}<td>${x.penalty_s?'+'+x.penalty_s+' с':'—'}`).join('')}</tbody></table></div>
-    <div class="bar" style="margin-top:10px"><a href="#/session/${race.uid}" class="chip" style="text-decoration:none">Круги, темп соперников, стратегия и износ шин — на странице гонки ›</a></div>`:''}`;
+    ${card(race?'Лучший круг гонки':'Лучший круг спринта',meR?fmt(meR.best_ms):'—')}</div>`:''}
+  ${qualiTable(shoot,'Спринт-квалификация',false)}
+  ${resultTable(sprint,'Спринт')}
+  ${qualiTable(quali,'Квалификация',!!race)}
+  ${quali.length&&race?'<div class="sub" style="margin-top:8px">Итог квалификации — место в последнем сегменте, где пилот участвовал. «Старт в гонке» и штраф считаются по стартовой позиции из итогов гонки.</div>':''}
+  ${resultTable(race,'Гонка')}`;
 }
 
 window.extraRoutes=a=>({weekend:()=>weekendPage(a),sessions:sessionsPage,seasons:seasonsPage,season:()=>seasonPage(a),new:()=>newSessionPage(a)});
