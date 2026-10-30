@@ -88,8 +88,9 @@ tr[style*="background"] td{background:inherit}
 <main id="app"></main>
 
 <script>window.F1_STATIC=true</script>
-<script src="seasons.js?v=63492243"></script>
-<script src="race.js?v=0a9476d9"></script>
+<script src="seasons.js?v=8ea99bed"></script>
+<script src="events.js?v=25ebb809"></script>
+<script src="race.js?v=08544661"></script>
 <script>
 const $=s=>document.querySelector(s), app=$('#app');
 const fmt=v=>v?Math.floor(v/6e4)+':'+((v%6e4)/1e3).toFixed(3).padStart(6,'0'):'—';
@@ -192,7 +193,26 @@ async function sessions(){
   $('#f').oninput=e=>{const q=e.target.value.toLowerCase();
     $('#list').innerHTML=sessTable(ss.filter(s=>(s.track+' '+s.type).toLowerCase().includes(q)))};
 }
+
+/* ---------- вкладки страницы сессии ---------- */
+let sessTab='overview', sessTabUid=null;
+const SESS_TABS=[['overview','Обзор'],['laps','Круги'],['rivals','Соперники'],['strategy','Стратегия'],['events','События']];
+function applyTab(){
+  app.querySelectorAll('[data-tab]').forEach(e=>e.style.display=e.dataset.tab===sessTab?'':'none');
+  app.querySelectorAll('#stabs button').forEach(b=>b.classList.toggle('on',b.dataset.st===sessTab));
+}
+function buildTabs(){
+  const el=$('#stabs'); if(!el) return;
+  const has=k=>[...app.querySelectorAll(`[data-tab="${k}"]`)].some(e=>e.textContent.trim());
+  const list=SESS_TABS.filter(([k])=>has(k));
+  if(!list.some(([k])=>k===sessTab)) sessTab='overview';
+  el.innerHTML=list.length>1?`<div class="seg">${list.map(([k,t])=>`<button data-st="${k}">${t}</button>`).join('')}</div>`:'';
+  el.onclick=e=>{const b=e.target.closest('button[data-st]');if(b){sessTab=b.dataset.st;applyTab()}};
+  applyTab();
+}
+window.applyTab=applyTab;
 async function session(uid){
+  if(sessTabUid!==uid){sessTabUid=uid;sessTab='overview'}
   const [s,laps]=await Promise.all([api('/api/session?uid='+enc(uid)),api('/api/laps?uid='+enc(uid))]);
   if(!s){app.innerHTML='<div class="empty">Сессия не найдена</div>';return}
   const st=stats(laps), prev=(await records(`?track=${enc(s.track)}&exclude=${enc(uid)}`))[0]||{};
@@ -200,24 +220,27 @@ async function session(uid){
   app.innerHTML=`<span class="back" onclick="history.back()">← назад</span>
   <h1>${esc(s.track)} <span class="tag">${esc(s.type)}</span>${isPB?'<span class="tag pb">новый рекорд трассы</span>':''}</h1>
   <div class="sub">${fmtD(s.started)}</div>
-  <div class="cards">
+  <div id="stabs" style="margin:6px 0 18px"></div>
+  <div data-tab="overview"><div class="cards">
     <div class="card"><div class="k">Лучший круг</div><div class="v p">${fmt(st.best)}</div></div>
     <div class="card"><div class="k">Идеальный круг</div><div class="v">${fmt(st.ideal)}</div></div>
     <div class="card"><div class="k">Средний</div><div class="v">${fmt(st.avg)}</div></div>
     <div class="card"><div class="k">Стабильность σ</div><div class="v">${st.sd?(st.sd/1e3).toFixed(3)+' с':'—'}</div></div>
     <div class="card"><div class="k">Валидных</div><div class="v">${st.v.length}/${laps.length}</div></div>
-  </div>
-  <h2>Темп по кругам</h2><div class="chart">${lapChart(laps)}</div>
+  </div></div>
+  <div data-tab="laps"><h2>Темп по кругам</h2><div class="chart">${lapChart(laps)}</div>
   <h2>Круги</h2><div class="panel"><table><thead><tr><th>Круг<th>Время<th>Δ к лучшему<th>S1<th>S2<th>S3<th>Шины</tr></thead><tbody>
   ${laps.map(l=>{const ok=l.valid;const c=(k,b)=>`<td class="${ok&&l[k]&&l[k]===b?'p':(ok&&prev[k==='time_ms'?'best':'b'+k.slice(1)]&&l[k]&&l[k]<prev[k==='time_ms'?'best':'b'+k.slice(1)]?'g':'')}">${k==='time_ms'?fmt(l[k]):fmtS(l[k])}`;
    return `<tr class="${ok?'':'bad'}"><td>${l.lap}${l.pit?'<span class="tag">pit</span>':''}${ok?'':'<span class="tag inv">недейств.</span>'}`+
    c('time_ms',st.best)+`<td>${ok&&st.best?(l.time_ms===st.best?'—':'+'+((l.time_ms-st.best)/1e3).toFixed(3)):''}`+c('s1',st.b1)+c('s2',st.b2)+c('s3',st.b3)+`<td>${tyre(l.tyre)} <span style="color:var(--mute)">${l.tyre_age} кр.</span>`}).join('')}
   </tbody></table></div>
-  <div class="sub" style="margin-top:8px"><span class="p">Фиолетовый</span> — лучшее в сессии, <span class="g">зелёный</span> — быстрее прошлого рекорда на этой трассе.</div>
-  <div class="bar edit" style="margin-top:20px"><button class="danger" id="del">Удалить сессию</button></div>`;
+  <div class="sub" style="margin-top:8px"><span class="p">Фиолетовый</span> — лучшее в сессии, <span class="g">зелёный</span> — быстрее прошлого рекорда на этой трассе.</div></div>
+  <div class="bar edit" data-tab="overview" id="del-wrap" style="margin-top:20px"><button class="danger" id="del">Удалить сессию</button></div>`;
   $('#del').onclick=async()=>{if(confirm('Удалить сессию и все её круги?')){await fetch('/api/session?uid='+uid,{method:'DELETE'});location.hash='#/sessions'}};
   await window.sessionRace(s);
   await window.sessionExtras(s);
+  app.appendChild($('#del-wrap'));  // «Удалить» — в самом низу обзора
+  buildTabs();
 }
 async function tracks(){
   const tr=await records();

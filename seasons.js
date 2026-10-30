@@ -45,6 +45,7 @@ window.sessionExtras=async function(s){
   ${res.map(r=>`<tr class="${r.me?'':''}"><td>${r.pos}<td>${esc(r.name)}${r.ai?'<span class="tag">бот</span>':''}${r.me?'<span class="tag pb">я</span>':''}<td>${esc(r.team)}<td>${startCell(r)}<td>${fmt(r.best_ms)}<td>${STATUS[r.status]||'Финиш'}`).join('')}</tbody></table></div>`:''}
   <div class="bar edit" style="margin-top:10px"><button id="m-edit">${res.length?'Править итоги':'Ввести итоги вручную'}</button></div>
   <div id="m-editor"></div>`;
+  box.dataset.tab='overview';
   app.appendChild(box);
   const upd=f=>async e=>{await post('/api/session_update',{uid:s.uid,[f]:e.target.value===''?null:(f==='season_id'?+e.target.value:e.target.value)});refresh()};
   $('#m-mode').onchange=upd('mode');$('#m-season').onchange=upd('season_id');$('#m-role').onchange=upd('role');

@@ -29,7 +29,7 @@ const dS=v=>v==null||isNaN(v)?'—':(v>0?'+':'')+(v/1e3).toFixed(3);
 
 window.sessionRace=async function(s){
   const R=await api('/api/race?uid='+enc(s.uid));
-  if(!R.drivers.length&&!R.wear.length) return;
+  if(!R.drivers.length&&!R.wear.length&&!(R.events||[]).length) return;
   const laps={}; R.laps.forEach(l=>(laps[l.car]??=[]).push(l));
   const drv=Object.fromEntries(R.drivers.map(d=>[d.car,d]));
   const nm=c=>(drv[c]||{name:'Car '+c}).name;
@@ -62,7 +62,7 @@ window.sessionRace=async function(s){
   const lastWear=c=>{const w=wearOf[c];if(!w||wearHidden(c))return w?'скрыт':'—';const l=w[w.length-1];return Math.max(l.fl,l.fr,l.rl,l.rr).toFixed(0)+'%'};
   const box=document.createElement('div'); app.appendChild(box);
   const draw=()=>{
-    let html='';
+    let html=`<div data-tab="overview">${overviewHTML(s,R,me?.car)}</div><div data-tab="rivals">`;
     if(R.laps.length){
       const bt=top('best'),b1=top('b1'),b2=top('b2'),b3=top('b3');
       const cell=(v,best,f)=>`<td class="${fin(v)&&v===best?'p':''}">${fin(v)?f(v):'—'}`;
@@ -103,6 +103,7 @@ window.sessionRace=async function(s){
       }
     }
 
+    html+='</div><div data-tab="strategy">';
     // стратегия: стинты и пит-стопы
     if(R.stints.length||R.pits.length){
       const total=Math.max(maxLap,...R.stints.map(x=>x.end_lap===255?0:x.end_lap))||1;
@@ -142,7 +143,10 @@ window.sessionRace=async function(s){
       ${hidden?'':`<div class="panel" style="margin-top:12px"><table><thead><tr><th>Круг<th>ПЛ<th>ПП<th>ЗЛ<th>ЗП<th>Макс.${cmp?`<th>Макс. у ${esc(nm(wearB))}`:''}</tr></thead><tbody>
       ${W.map(w=>{const o=cmp?wearOf[wearB].find(x=>x.lap===w.lap):null;return `<tr><td>${w.lap}<td>${w.fl}%<td>${w.fr}%<td>${w.rl}%<td>${w.rr}%<td><b>${Math.max(w.fl,w.fr,w.rl,w.rr)}%</b>${cmp?`<td>${o?Math.max(o.fl,o.fr,o.rl,o.rr)+'%':'—'}`:''}`}).join('')}</tbody></table></div>`}`;
     }
+    html+=`</div><div data-tab="events">${eventsHTML(R,nm,me?.car)}</div><div data-tab="laps">${gapsHTML(R,me?.car,cmpB,nm)}</div>`;
     box.innerHTML=html;
+    box.querySelectorAll('[data-evf]').forEach(b=>b.onclick=()=>{evFilter=b.dataset.evf;draw()});
+    if(window.applyTab&&$('#stabs')?.innerHTML) applyTab();
     const a=box.querySelector('#cmpA'),b=box.querySelector('#cmpB');
     if(a){a.onchange=()=>{cmpA=+a.value;draw()};b.onchange=()=>{cmpB=+b.value;draw()}}
     const wa=box.querySelector('#wearA'),wb=box.querySelector('#wearB');
