@@ -88,8 +88,8 @@ tr[style*="background"] td{background:inherit}
 <main id="app"></main>
 
 <script>window.F1_STATIC=true</script>
-<script src="seasons.js"></script>
-<script src="race.js"></script>
+<script src="seasons.js?v=63492243"></script>
+<script src="race.js?v=8abe7dc0"></script>
 <script>
 const $=s=>document.querySelector(s), app=$('#app');
 const fmt=v=>v?Math.floor(v/6e4)+':'+((v%6e4)/1e3).toFixed(3).padStart(6,'0'):'—';
@@ -255,7 +255,7 @@ async function route(){
 }
 async function live(){
   try{const [d]=await api('/api/live');
-    if(STATIC){$('#live').innerHTML=`Только просмотр<br>Обновлено ${fmtD(d.published)}`;return}
+    if(STATIC){$('#live').innerHTML=`Только просмотр<br>Данные на ${fmtD(d.published)}`;return}
     $('#live').innerHTML=d.active?`<span class="dot on"></span><b style="color:var(--text)">Идёт запись</b><br>${esc(d.track)} · ${esc(d.type)}<br>Круг ${d.lap} · ${tyre(d.tyre)}`
       :`<span class="dot"></span>Ожидание данных<br>Включи телеметрию в игре`;
     if(d.active&&(location.hash===''||location.hash==='#/')&&!live.last||live.last&&d.lap!==live.last.lap&&d.active&&['','#/','#/sessions'].includes(location.hash)) route();
