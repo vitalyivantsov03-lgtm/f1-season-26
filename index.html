@@ -89,8 +89,11 @@ tr[style*="background"] td{background:inherit}
 
 <script>window.F1_STATIC=true</script>
 <script src="seasons.js?v=8ea99bed"></script>
-<script src="events.js?v=25ebb809"></script>
-<script src="race.js?v=08544661"></script>
+<script src="events.js?v=9085e548"></script>
+<script src="car.js?v=cc4addd3"></script>
+<script src="telemetry.js?v=4dfa07dc"></script>
+<script src="garage.js?v=c9e7a5b7"></script>
+<script src="race.js?v=1b4f7a0a"></script>
 <script>
 const $=s=>document.querySelector(s), app=$('#app');
 const fmt=v=>v?Math.floor(v/6e4)+':'+((v%6e4)/1e3).toFixed(3).padStart(6,'0'):'—';
@@ -105,8 +108,9 @@ function apiPath(u){
   if(!STATIC) return u;
   const [p,qs]=u.split('?'), q=new URLSearchParams(qs||''), name=p.replace('/api/','');
   if(name==='records'&&q.get('exclude')) return `api/prev/${q.get('exclude')}.json`;
-  if(['session','laps','results','race'].includes(name)) return `api/${name}/${q.get('uid')}.json`;
-  if(name==='track_laps') return `api/track_laps/${q.get('track').replace(/[^A-Za-z0-9]/g,'_')}.json`;
+  if(['session','laps','results','race','traces'].includes(name)) return `api/${name}/${q.get('uid')}.json`;
+  if(name==='trace') return `api/trace/${q.get('uid')}_${q.get('car')}_${q.get('lap')}.json`;
+  if(name==='track_laps'||name==='track_setups') return `api/${name}/${q.get('track').replace(/[^A-Za-z0-9]/g,'_')}.json`;
   if(name==='weekend') return `api/weekend/${q.get('key')}.json`;
   if(name==='season') return `api/season/${q.get('id')}.json`;
   return `api/${name}.json`;
@@ -196,7 +200,7 @@ async function sessions(){
 
 /* ---------- вкладки страницы сессии ---------- */
 let sessTab='overview', sessTabUid=null;
-const SESS_TABS=[['overview','Обзор'],['laps','Круги'],['rivals','Соперники'],['strategy','Стратегия'],['events','События']];
+const SESS_TABS=[['overview','Обзор'],['laps','Круги'],['tele','Телеметрия'],['rivals','Соперники'],['strategy','Стратегия'],['car','Машина'],['setup','Настройки'],['events','События']];
 function applyTab(){
   app.querySelectorAll('[data-tab]').forEach(e=>e.style.display=e.dataset.tab===sessTab?'':'none');
   app.querySelectorAll('#stabs button').forEach(b=>b.classList.toggle('on',b.dataset.st===sessTab));
@@ -266,6 +270,7 @@ async function track(name){
   <h2>Прогресс (лучший круг по сессиям)</h2><div class="chart">${progressChart(prog)||'<div class="empty">Мало данных</div>'}</div>
   <h2>Топ-10 кругов</h2><div class="panel"><table><thead><tr><th>#<th>Время<th>S1<th>S2<th>S3<th>Шины<th>Сессия</tr></thead><tbody>
   ${top.map((l,i)=>`<tr class="click" onclick="location.hash='#/session/${l.uid}'"><td>${i+1}<td class="${i?'':'p'}">${fmt(l.time_ms)}<td>${fmtS(l.s1)}<td>${fmtS(l.s2)}<td>${fmtS(l.s3)}<td>${tyre(l.tyre)}<td>${fmtD(l.started)} ${esc(l.type)}`).join('')}</tbody></table></div>`;
+  await window.trackSetups(name);
 }
 
 /* ---------- роутер и live ---------- */

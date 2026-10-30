@@ -28,8 +28,8 @@ const median=a=>{if(!a.length)return 0;const b=[...a].sort((x,y)=>x-y),m=b.lengt
 const dS=v=>v==null||isNaN(v)?'—':(v>0?'+':'')+(v/1e3).toFixed(3);
 
 window.sessionRace=async function(s){
-  const R=await api('/api/race?uid='+enc(s.uid));
-  if(!R.drivers.length&&!R.wear.length&&!(R.events||[]).length) return;
+  const [R,T]=await Promise.all([api('/api/race?uid='+enc(s.uid)),api('/api/traces?uid='+enc(s.uid)).catch(()=>[])]);
+  if(!R.drivers.length&&!R.wear.length&&!(R.events||[]).length&&!(R.car_state||[]).length&&!T.length&&!(R.setups||[]).length&&!R.tyre_sets&&!R.time_trial) return;
   const laps={}; R.laps.forEach(l=>(laps[l.car]??=[]).push(l));
   const drv=Object.fromEntries(R.drivers.map(d=>[d.car,d]));
   const nm=c=>(drv[c]||{name:'Car '+c}).name;
@@ -62,7 +62,7 @@ window.sessionRace=async function(s){
   const lastWear=c=>{const w=wearOf[c];if(!w||wearHidden(c))return w?'скрыт':'—';const l=w[w.length-1];return Math.max(l.fl,l.fr,l.rl,l.rr).toFixed(0)+'%'};
   const box=document.createElement('div'); app.appendChild(box);
   const draw=()=>{
-    let html=`<div data-tab="overview">${overviewHTML(s,R,me?.car)}</div><div data-tab="rivals">`;
+    let html=`<div data-tab="overview">${overviewHTML(s,R,me?.car)}${ttHTML(R)}</div><div data-tab="rivals">`;
     if(R.laps.length){
       const bt=top('best'),b1=top('b1'),b2=top('b2'),b3=top('b3');
       const cell=(v,best,f)=>`<td class="${fin(v)&&v===best?'p':''}">${fin(v)?f(v):'—'}`;
@@ -119,6 +119,7 @@ window.sessionRace=async function(s){
       </tbody></table></div>`:''}`;
     }
 
+    html+=tyreSetsHTML(R);
     // износ шин: любой пилот + сравнение с соперником (у живых игроков может быть скрыт настройкой телеметрии)
     if(Object.keys(wearOf).length){
       if(wearA==null||!wearOf[wearA]) wearA=me&&wearOf[me.car]?me.car:+Object.keys(wearOf)[0];
@@ -143,8 +144,11 @@ window.sessionRace=async function(s){
       ${hidden?'':`<div class="panel" style="margin-top:12px"><table><thead><tr><th>Круг<th>ПЛ<th>ПП<th>ЗЛ<th>ЗП<th>Макс.${cmp?`<th>Макс. у ${esc(nm(wearB))}`:''}</tr></thead><tbody>
       ${W.map(w=>{const o=cmp?wearOf[wearB].find(x=>x.lap===w.lap):null;return `<tr><td>${w.lap}<td>${w.fl}%<td>${w.fr}%<td>${w.rl}%<td>${w.rr}%<td><b>${Math.max(w.fl,w.fr,w.rl,w.rr)}%</b>${cmp?`<td>${o?Math.max(o.fl,o.fr,o.rl,o.rr)+'%':'—'}`:''}`}).join('')}</tbody></table></div>`}`;
     }
-    html+=`</div><div data-tab="events">${eventsHTML(R,nm,me?.car)}</div><div data-tab="laps">${gapsHTML(R,me?.car,cmpB,nm)}</div>`;
+    html+=`</div><div data-tab="car">${carHTML(R,nm,me?.car,s.uid)}</div><div data-tab="setup">${setupHTML(R,s.uid)}</div><div data-tab="events">${eventsHTML(R,nm,me?.car)}</div><div data-tab="laps">${gapsHTML(R,me?.car,cmpB,nm)}</div><div data-tab="tele">${teleHTML(T,R,nm,me?.car,s.uid)}</div>`;
     box.innerHTML=html;
+    bindCar(box,draw);
+    bindSetup(box,draw);
+    bindTele(box,s.uid,nm,me?.car);
     box.querySelectorAll('[data-evf]').forEach(b=>b.onclick=()=>{evFilter=b.dataset.evf;draw()});
     if(window.applyTab&&$('#stabs')?.innerHTML) applyTab();
     const a=box.querySelector('#cmpA'),b=box.querySelector('#cmpB');

@@ -23,7 +23,10 @@ const EV_KIND={PENA:['pen','ШТРАФ','#ff4747'],COLL:['coll','СТОЛКНО�
   FTLP:['fast','ЛУЧШИЙ КРУГ','#b46bff'],SCAR:['flag','СЕЙФТИ-КАР','#ffd23f'],RDFL:['flag','КРАСНЫЙ ФЛАГ','#ff4747'],
   RTMT:['flag','СХОД','#636270'],LGOT:['flag','СТАРТ','#5EC61B'],CHQF:['flag','ФИНИШ','#c0c1db'],RCWN:['flag','ПОБЕДА','#DCBE55'],
   DTSV:['pen','ШТРАФ ОТБЫТ','#636270'],SGSV:['pen','ШТРАФ ОТБЫТ','#636270'],FLBK:['flag','ФЛЕШБЭК','#636270'],
-  TMPT:['flag','НАПАРНИК В БОКСАХ','#636270']};
+  TMPT:['flag','НАПАРНИК В БОКСАХ','#636270'],DMG:['coll','ПОВРЕЖДЕНИЕ','#ff9f43'],FIX:['coll','РЕМОНТ','#2fa36b']};
+const PART_NAMES={fwl:'переднее крыло (лев.)',fwr:'переднее крыло (прав.)',rw:'заднее крыло',floor:'днище',diff:'диффузор',
+  pod:'понтоны',gbox:'коробка передач',eng:'двигатель',drs:'отказ DRS',ers:'отказ ERS',blown:'двигатель взорван',seized:'двигатель заклинил'};
+const FAULTS=['drs','ers','blown','seized'];
 const evInfo=e=>{try{return e.info?JSON.parse(e.info):{}}catch{return {}}};
 const isWarning=e=>e.code==='PENA'&&[5,10,11,12,13,14,15].includes(evInfo(e).type);  // предупреждения и аннулированные круги
 const fmtT=t=>t==null?'':`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
@@ -49,6 +52,8 @@ function eventText(e,nm,meCar){
     case 'SGSV': return `${n(e.car)} отбыл стоп-энд-гоу`;
     case 'FLBK': return `Флешбэк к ${fmtT(e.value)}`;
     case 'TMPT': return `Напарник ${n(e.car)} заехал в боксы`;
+    case 'DMG': case 'FIX':{const p=Object.entries(i.parts||{}).map(([k,[a,b]])=>FAULTS.includes(k)?PART_NAMES[k]:`${PART_NAMES[k]||k} ${a}% → ${b}%`).join(', ');
+      return e.code==='DMG'?`${n(e.car)}: ${p}`:`${n(e.car)} — починили: ${p}`}
   }
   return e.code;
 }
@@ -82,11 +87,11 @@ function eventsHTML(R,nm,meCar){
   const ev=(R.events||[]).filter(e=>!['SPTP','SSTA','SEND','STLG','BUTN'].includes(e.code));
   if(!ev.length&&!(R.car_info||[]).length) return '';
   const filt={all:()=>true,mine:e=>e.car===meCar||e.other===meCar,pen:e=>['PENA','DTSV','SGSV'].includes(e.code),
-    coll:e=>e.code==='COLL',ovtk:e=>e.code==='OVTK',fast:e=>e.code==='FTLP',flag:e=>['SCAR','RDFL','RTMT','LGOT','CHQF','RCWN'].includes(e.code)};
+    coll:e=>['COLL','DMG','FIX'].includes(e.code),ovtk:e=>e.code==='OVTK',fast:e=>e.code==='FTLP',flag:e=>['SCAR','RDFL','RTMT','LGOT','CHQF','RCWN'].includes(e.code)};
   const counts=Object.fromEntries(Object.entries(filt).map(([k,f])=>[k,ev.filter(f).length]));
   const shown=ev.filter(filt[evFilter]||filt.all);
   const byLap={};shown.forEach(e=>(byLap[e.lap??0]??=[]).push(e));
-  const tabs=[['all','Все'],['mine','Мои'],['pen','Штрафы'],['coll','Контакты'],['ovtk','Обгоны'],['fast','Лучшие круги'],['flag','Флаги и старт']];
+  const tabs=[['all','Все'],['mine','Мои'],['pen','Штрафы'],['coll','Контакты и повреждения'],['ovtk','Обгоны'],['fast','Лучшие круги'],['flag','Флаги и старт']];
   let h=`<h2>Лента событий</h2><div class="bar">${tabs.filter(([k])=>counts[k]||k==='all').map(([k,t])=>`<button class="${evFilter===k?'':'ghost'}" data-evf="${k}" style="min-width:0">${t} · ${counts[k]}</button>`).join('')}</div>`;
   h+=shown.length?Object.keys(byLap).sort((a,b)=>a-b).map(lap=>`<div class="panel" style="margin-bottom:10px;padding:10px 14px">
     <div style="font:700 15px var(--display);margin-bottom:6px;color:var(--peri)">${+lap?`Круг ${lap}`:'До старта'}</div>
