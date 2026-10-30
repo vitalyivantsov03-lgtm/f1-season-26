@@ -106,10 +106,12 @@ function apiPath(u){
   if(name==='records'&&q.get('exclude')) return `api/prev/${q.get('exclude')}.json`;
   if(['session','laps','results','race'].includes(name)) return `api/${name}/${q.get('uid')}.json`;
   if(name==='track_laps') return `api/track_laps/${q.get('track').replace(/[^A-Za-z0-9]/g,'_')}.json`;
+  if(name==='weekend') return `api/weekend/${q.get('key')}.json`;
   if(name==='season') return `api/season/${q.get('id')}.json`;
   return `api/${name}.json`;
 }
-const api=async u=>(await fetch(apiPath(u))).json();
+// GitHub Pages отдаёт файлы с кэшем на 10 минут — просим браузер всегда сверяться с сервером
+const api=async u=>(await fetch(apiPath(u),STATIC?{cache:'no-cache'}:undefined)).json();
 if(STATIC) document.body.classList.add('static');
 const min=a=>a.length?Math.min(...a):0;
 
@@ -174,8 +176,14 @@ async function home(){
 }
 function sessTable(ss){
   if(!ss.length) return '<div class="empty">Сессий пока нет</div>';
-  return `<div class="panel"><table><thead><tr><th>Дата<th>Трасса<th>Тип<th>Кругов<th>Лучший</tr></thead><tbody>
-  ${ss.map(s=>`<tr class="click" onclick="location.hash='#/session/${s.uid}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td>${esc(s.type)}${window.modeBadge(s)}<td>${s.laps}<td class="${s.best?'p':''}">${fmt(s.best)}`).join('')}</tbody></table></div>`;
+  // сессии одного уикенда (общий ID от игры или объединённые вручную) — одной строкой
+  const groups=[],byKey={};
+  for(const s of ss){const k=s.weekend&&s.weekend!=='0'?s.weekend:null;
+    if(k&&byKey[k]){byKey[k].push(s);continue}const g=[s];groups.push(g);if(k)byKey[k]=g}
+  const row=g=>{const s=g[0];if(g.length===1)return `<tr class="click" onclick="location.hash='#/session/${s.uid}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td>${esc(s.type)}${window.modeBadge(s)}<td>${s.laps}<td class="${s.best?'p':''}">${fmt(s.best)}`;
+    const types=[...g].reverse().map(x=>x.type.replace('One-Shot Qualifying','Квал.').replace('Short Qualifying','Квал.')).join(' · '), best=min(g.map(x=>x.best).filter(Boolean));
+    return `<tr class="click" onclick="location.hash='#/weekend/${encodeURIComponent(s.weekend)}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td><b>Уикенд</b> <span style="color:var(--mute)">${esc(types)}</span>${window.modeBadge(s)}<td>${g.reduce((a,x)=>a+x.laps,0)}<td class="${best?'p':''}">${fmt(best)}`};
+  return `<div class="panel"><table><thead><tr><th>Дата<th>Трасса<th>Тип<th>Кругов<th>Лучший</tr></thead><tbody>${groups.map(row).join('')}</tbody></table></div>`;
 }
 async function sessions(){
   const ss=await api('/api/sessions');
@@ -240,7 +248,7 @@ async function track(name){
 /* ---------- роутер и live ---------- */
 async function route(){
   const [_,r,arg]=location.hash.split('/'), a=arg?decodeURIComponent(arg):'';
-  const page=({session:'sessions',track:'tracks',season:'seasons',new:'seasons'}[r])||r||'home';
+  const page=({session:'sessions',weekend:'sessions',track:'tracks',season:'seasons',new:'seasons'}[r])||r||'home';
   document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.dataset.r===page));
   try{await ({'':home,sessions,session:()=>session(a),tracks,track:()=>track(a),...window.extraRoutes(a)}[r||'']||home)()}
   catch(e){app.innerHTML='<div class="empty">Ошибка загрузки: '+esc(e)+'</div>'}
