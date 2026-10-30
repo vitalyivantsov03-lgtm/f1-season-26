@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F1 Laps Local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Токены дизайн-системы EA Racenet (цвета, размеры, скругления, типографика сняты с racenet.com).
+   Фирменные шрифты EA заменены открытыми похожими: Poppins (заголовки) и Inter (текст). */
+:root{--bg:#1D2033;--side:#141724;--panel:#191C2E;--row:#141724;--panel2:#272C40;--line:#2E3249;--text:#FFFFFF;
+--mute:rgba(192,193,219,.75);--peri:#C0C1DB;--red:#FF4747;--red2:#DC2929;--blue:#3471E9;--blue2:#1A53C4;--bluesel:#2A62CE;
+--purple:#B46BFF;--green:#5EC61B;--yellow:#D0DA46;--cyan:#19CAF8;--gold:#DCBE55;--silver:#8A97A4;--bronze:#8C5D35;--inputGrey:#797A9E;
+--display:'Poppins','Segoe UI',Helvetica,sans-serif;--font:'Inter','Segoe UI',Helvetica,sans-serif}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:7px;height:7px}::-webkit-scrollbar-thumb{background:var(--inputGrey);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font:400 16px/1.2 var(--font);display:flex;min-height:100vh}
+aside{width:80px;background:var(--side);padding:14px 4px;position:sticky;top:0;height:100vh;flex-shrink:0;display:flex;flex-direction:column;align-items:center;box-shadow:-4px 0 4px 0 rgba(34,20,33,.3)}
+.logo{display:flex;flex-direction:column;align-items:center;gap:3px;margin-bottom:26px;color:var(--red);font:700 12px var(--display)}
+.logo i{width:40px;height:40px;border-radius:50%;background:var(--red);color:#fff;display:grid;place-items:center;font:700 14px var(--display);font-style:italic}
+nav{display:flex;flex-direction:column;gap:14px;width:100%}
+nav a{display:flex;flex-direction:column;align-items:center;gap:4px;padding:4px 2px;color:var(--text);text-decoration:none;font:400 13px var(--font);transition:all .2s ease-in-out}
+nav a svg{width:26px;height:26px;fill:currentColor}
+nav a:hover{opacity:.8}nav a.on{color:var(--red)}
+.live{margin-top:auto;padding:8px 4px;border-radius:8px;background:var(--panel2);font-size:10px;color:var(--peri);text-align:center;line-height:1.3;width:100%}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#636270;margin-right:3px}.dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+main{flex:1;padding:32px 40px;max-width:1440px;min-width:0}
+h1{margin:0 0 8px;font:700 40px/1.4 var(--display)}h2{font:700 24px/1.1 var(--display);margin:32px 0 16px}h3{font:700 20px/1.1 var(--display)}
+.sub{color:var(--mute);margin-bottom:20px;line-height:1.3}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.card{background:var(--panel2);border-radius:8px;padding:14px 16px}
+.card .k{color:var(--peri);font-size:12px;text-transform:uppercase;letter-spacing:1.3px;font-weight:700}
+.card .v{font:700 26px var(--display);margin-top:4px;font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border-radius:8px;padding:8px 0;overflow:auto}
+table{width:100%;border-collapse:separate;border-spacing:0 4px;font-variant-numeric:tabular-nums}
+.panel table{padding:0 12px}
+th{color:var(--text);font:700 16px var(--display);text-transform:uppercase;text-align:right;padding:10px 12px}
+td{padding:10px 12px;text-align:right;background:var(--row);white-space:nowrap;font-size:16px}
+td:first-child{border-radius:4px 0 0 4px}td:last-child{border-radius:0 4px 4px 0}
+th:first-child,td:first-child{text-align:left}
+tbody tr.click{cursor:pointer}tbody tr.click:hover td{background:var(--panel2)}
+.p{color:var(--purple);font-weight:700}.g{color:var(--green);font-weight:700}.bad td{color:#636270}.bad td:nth-child(2){text-decoration:line-through}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font:700 11px var(--font);letter-spacing:.5px;background:var(--panel2);color:var(--peri);margin-left:6px;vertical-align:middle;text-transform:uppercase}
+.tag.pb{background:var(--purple);color:#141724}.tag.inv{background:#4a2230;color:#ff8f8f}
+.chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border:2px solid rgba(192,193,219,.75);border-radius:18px;color:var(--peri);font:400 16px var(--font)}
+.chip.fill{background:var(--peri);border-color:var(--peri);color:#141724}.chip.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.status{display:inline-block;padding:3px 8px;border-radius:2px;font:700 13px var(--display);letter-spacing:.3px;background:var(--yellow);color:#141724;text-transform:uppercase}
+.status.done{background:#636270;color:#fff}.status.next{background:var(--blue);color:#fff}
+.pos1{color:var(--gold)!important;font-weight:700}.pos2{color:var(--silver)!important;font-weight:700}.pos3{color:#c08552!important;font-weight:700}
+.tyre{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;border:2px solid;vertical-align:-1px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.tcard{background:var(--panel2);border:2px solid transparent;border-radius:8px;padding:18px;cursor:pointer;transition:all .2s ease-in-out;box-shadow:-2px 2px 4px 0 rgba(34,20,33,.4)}
+.tcard:hover{border-color:var(--peri)}.tcard h3{margin:8px 0 6px;font-size:22px}.tcard .big{font:700 30px var(--display);font-variant-numeric:tabular-nums;margin:8px 0}
+.secs{display:flex;gap:16px;color:var(--mute);font-size:12px}.secs b{display:block;color:var(--text);font-size:14px}
+.chart{background:var(--panel);border-radius:8px;padding:12px}
+button,select,input,textarea{background:var(--row);color:var(--text);border:2px solid var(--inputGrey);border-radius:8px;padding:0 12px;height:36px;font:400 16px var(--font)}
+textarea{height:auto;padding:8px 12px}input[type=checkbox]{height:auto;accent-color:var(--blue)}
+button{height:33px;min-width:120px;padding:0 24px;border-radius:18px;background:var(--blue);border-color:var(--blue);color:#fff;font:700 13px var(--display);letter-spacing:1.3px;text-transform:uppercase;cursor:pointer;transition:all .3s cubic-bezier(.4,0,.2,1)}
+button:hover{background:var(--blue2);border-color:var(--blue2)}
+button.ghost{background:transparent;border-color:#fff;border-radius:8px}button.ghost:hover{background:#fff;color:#14152E}
+button.danger{background:transparent;border-color:var(--red);border-radius:8px}button.danger:hover{background:var(--red2);border-color:var(--red2)}
+.seg{display:inline-flex;border:2px solid var(--blue);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent;min-width:140px;height:33px}
+.seg button.on{background:var(--blue)}.seg button:hover{background:var(--blue2)}
+.bar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.back{color:var(--peri);cursor:pointer;margin-bottom:12px;display:inline-block}.back:hover{opacity:.8}
+.empty{padding:50px;text-align:center;color:var(--mute)}
+svg text{fill:var(--peri);font-size:11px}
+a{color:var(--red)}
+.static .edit{display:none!important}
+tr[style*="background"] td{background:inherit}
+@media(max-width:760px){body{flex-direction:column}aside{width:100%;height:auto;position:static;flex-direction:row;gap:8px;overflow:auto;padding:8px}
+  .logo{margin:0 6px 0 0}nav{flex-direction:row}nav a{padding:4px 8px}.live{display:none}main{padding:16px}h1{font-size:30px}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="logo"><i>F1</i>Laps</div>
+  <nav>
+    <a href="#/" data-r="home"><svg viewBox="0 0 24 24"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/></svg>Дашборд</a>
+    <a href="#/sessions" data-r="sessions"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2m1 11h-4V7h2v4h2z"/></svg>Сессии</a>
+    <a href="#/seasons" data-r="seasons"><svg viewBox="0 0 24 24"><path d="M19 5h-2V3H7v2H5a2 2 0 0 0-2 2v1a5 5 0 0 0 4.4 5A5 5 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1A5 5 0 0 0 16.6 13 5 5 0 0 0 21 8V7a2 2 0 0 0-2-2M5 8V7h2v3.8A3 3 0 0 1 5 8m14 0a3 3 0 0 1-2 2.8V7h2z"/></svg>Сезоны</a>
+    <a href="#/tracks" data-r="tracks"><svg viewBox="0 0 24 24"><path d="M3 3v18h2v-7h7l1 2h8V6h-7l-1-2H5V3z"/></svg>Трассы</a>
+  </nav>
+  <div class="live" id="live"></div>
+</aside>
+<main id="app"></main>
+
+<script>window.F1_STATIC=true</script>
+<script src="seasons.js"></script>
+<script src="race.js"></script>
+<script>
+const $=s=>document.querySelector(s), app=$('#app');
+const fmt=v=>v?Math.floor(v/6e4)+':'+((v%6e4)/1e3).toFixed(3).padStart(6,'0'):'—';
+const fmtS=v=>v?(v/1e3).toFixed(3):'—';
+const fmtD=t=>new Date(t*1e3).toLocaleString('ru',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TYRE={Soft:'#ff3b3b',Medium:'#ffd23f',Hard:'#ffffff',Inter:'#2fd67b',Wet:'#4aa8ff'};
+const tyre=t=>`<span class="tyre" style="border-color:${TYRE[t]||'#777'}"></span>${esc(t)}`;
+// На Netlify (F1_STATIC) сервера нет: тот же запрос читается из заранее собранного JSON-файла
+const STATIC=!!window.F1_STATIC;
+function apiPath(u){
+  if(!STATIC) return u;
+  const [p,qs]=u.split('?'), q=new URLSearchParams(qs||''), name=p.replace('/api/','');
+  if(name==='records'&&q.get('exclude')) return `api/prev/${q.get('exclude')}.json`;
+  if(['session','laps','results','race'].includes(name)) return `api/${name}/${q.get('uid')}.json`;
+  if(name==='track_laps') return `api/track_laps/${q.get('track').replace(/[^A-Za-z0-9]/g,'_')}.json`;
+  if(name==='season') return `api/season/${q.get('id')}.json`;
+  return `api/${name}.json`;
+}
+const api=async u=>(await fetch(apiPath(u))).json();
+if(STATIC) document.body.classList.add('static');
+const min=a=>a.length?Math.min(...a):0;
+
+/* ---------- расчёты ---------- */
+function stats(laps){
+  const v=laps.filter(l=>l.valid&&l.time_ms);
+  const best=min(v.map(l=>l.time_ms));
+  const b1=min(v.map(l=>l.s1).filter(Boolean)),b2=min(v.map(l=>l.s2).filter(Boolean)),b3=min(v.map(l=>l.s3).filter(Boolean));
+  const ideal=b1&&b2&&b3?b1+b2+b3:0;
+  const avg=v.length?v.reduce((a,l)=>a+l.time_ms,0)/v.length:0;
+  const sd=v.length>1?Math.sqrt(v.reduce((a,l)=>a+(l.time_ms-avg)**2,0)/(v.length-1)):0;
+  return {v,best,b1,b2,b3,ideal,avg,sd};
+}
+// рекорды считает сервер (/api/records), здесь только идеальный круг
+const records=async(q='')=>(await api('/api/records'+q)).map(r=>({...r,ideal:r.b1&&r.b2&&r.b3?r.b1+r.b2+r.b3:0}));
+const enc=encodeURIComponent;
+
+/* ---------- график времени круга ---------- */
+function lapChart(laps,{w=1100,h=280}={}){
+  const v=laps.filter(l=>l.valid&&l.time_ms); if(v.length<1) return '<div class="empty">Нет валидных кругов</div>';
+  const best=min(v.map(l=>l.time_ms)), cap=Math.max(best*1.08,...[...v].sort((a,b)=>a.time_ms-b.time_ms).slice(0,Math.ceil(v.length*.9)).map(l=>l.time_ms));
+  const lo=best-(cap-best)*.15, hi=cap+(cap-best)*.1;
+  const L=60,R=16,T=14,B=28,n=laps.length;
+  const x=i=>L+(n<2?(w-L-R)/2:i*(w-L-R)/(n-1)), y=t=>T+(Math.min(t,hi)-lo)/(hi-lo)*(h-T-B);
+  let g='';
+  for(let k=0;k<=4;k++){const t=lo+(hi-lo)*k/4,yy=y(t);g+=`<line x1="${L}" x2="${w-R}" y1="${yy}" y2="${yy}" stroke="#2a2d38"/><text x="${L-8}" y="${yy+4}" text-anchor="end">${fmt(t)}</text>`}
+  const pts=laps.map((l,i)=>[x(i),y(l.time_ms),l]);
+  const vp=pts.filter(p=>p[2].valid);
+  g+=`<polyline fill="none" stroke="#e10600" stroke-width="2" points="${vp.map(p=>p[0]+','+p[1]).join(' ')}"/>`;
+  g+=`<line x1="${L}" x2="${w-R}" y1="${y(best)}" y2="${y(best)}" stroke="#b46bff" stroke-dasharray="4 4"/>`;
+  for(const [px,py,l] of pts){
+    const c=l.valid?(l.time_ms===best?'#b46bff':(TYRE[l.tyre]||'#aaa')):'#555';
+    g+=`<circle cx="${px}" cy="${py}" r="${l.time_ms===best?6:4.5}" fill="${l.valid?c:'none'}" stroke="${c}" stroke-width="2"><title>Круг ${l.lap}: ${fmt(l.time_ms)}${l.valid?'':' (недействителен)'}</title></circle>`;
+    if(n<=40||l.lap%5===0) g+=`<text x="${px}" y="${h-8}" text-anchor="middle">${l.lap}</text>`;
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%">${g}</svg>`;
+}
+function progressChart(points,{w=700,h=200}={}){ // [{label,t}]
+  if(!points.length) return '';
+  const ts=points.map(p=>p.t),lo=Math.min(...ts)*.998,hi=Math.max(...ts)*1.002||lo+1,L=60,R=16,T=12,B=22,n=points.length;
+  const x=i=>L+(n<2?(w-L-R)/2:i*(w-L-R)/(n-1)),y=t=>T+(t-lo)/((hi-lo)||1)*(h-T-B);
+  let g=`<text x="${L-8}" y="${T+4}" text-anchor="end">${fmt(hi)}</text><text x="${L-8}" y="${h-B+4}" text-anchor="end">${fmt(lo)}</text>`;
+  g+=`<polyline fill="none" stroke="#2fd67b" stroke-width="2" points="${points.map((p,i)=>x(i)+','+y(p.t)).join(' ')}"/>`;
+  points.forEach((p,i)=>g+=`<circle cx="${x(i)}" cy="${y(p.t)}" r="4" fill="#2fd67b"><title>${p.label}: ${fmt(p.t)}</title></circle>`);
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%">${g}</svg>`;
+}
+
+/* ---------- страницы ---------- */
+async function home(){
+  const [ss,tr]=await Promise.all([api('/api/sessions'),records()]);
+  const sum=k=>tr.reduce((a,t)=>a+(t[k]||0),0), valid=sum('valid');
+  app.innerHTML=`<h1>Дашборд</h1><div class="sub">Вся твоя статистика, записанная с телеметрии игры</div>
+  <div class="cards">
+    <div class="card"><div class="k">Сессий</div><div class="v">${ss.length}</div></div>
+    <div class="card"><div class="k">Кругов</div><div class="v">${sum('laps')}</div></div>
+    <div class="card"><div class="k">Валидных</div><div class="v">${valid}</div></div>
+    <div class="card"><div class="k">Трасс</div><div class="v">${tr.length}</div></div>
+  </div>
+  <h2>Последние сессии</h2>${sessTable(ss.slice(0,6))}
+  <h2>Личные рекорды</h2>${tr.length?`<div class="panel"><table><thead><tr><th>Трасса<th>Лучший круг<th>Идеальный<th>Кругов</tr></thead><tbody>
+  ${tr.map(t=>`<tr class="click" onclick="location.hash='#/track/${enc(t.track)}'"><td>${esc(t.track)}<td class="p">${fmt(t.best)}<td>${fmt(t.ideal)}<td>${t.laps}`).join('')}</tbody></table></div>`:'<div class="empty">Пока нет данных. Запусти гонку на консоли — круги появятся здесь сами.</div>'}`;
+}
+function sessTable(ss){
+  if(!ss.length) return '<div class="empty">Сессий пока нет</div>';
+  return `<div class="panel"><table><thead><tr><th>Дата<th>Трасса<th>Тип<th>Кругов<th>Лучший</tr></thead><tbody>
+  ${ss.map(s=>`<tr class="click" onclick="location.hash='#/session/${s.uid}'"><td>${fmtD(s.started)}<td>${esc(s.track)}<td>${esc(s.type)}${window.modeBadge(s)}<td>${s.laps}<td class="${s.best?'p':''}">${fmt(s.best)}`).join('')}</tbody></table></div>`;
+}
+async function sessions(){
+  const ss=await api('/api/sessions');
+  app.innerHTML=`<h1>Сессии</h1><div class="sub">${ss.length} записано</div>
+  <div class="bar"><input id="f" placeholder="Поиск по трассе или типу…"></div><div id="list">${sessTable(ss)}</div>`;
+  $('#f').oninput=e=>{const q=e.target.value.toLowerCase();
+    $('#list').innerHTML=sessTable(ss.filter(s=>(s.track+' '+s.type).toLowerCase().includes(q)))};
+}
+async function session(uid){
+  const [s,laps]=await Promise.all([api('/api/session?uid='+enc(uid)),api('/api/laps?uid='+enc(uid))]);
+  if(!s){app.innerHTML='<div class="empty">Сессия не найдена</div>';return}
+  const st=stats(laps), prev=(await records(`?track=${enc(s.track)}&exclude=${enc(uid)}`))[0]||{};
+  const isPB=st.best&&(!prev.best||st.best<prev.best);
+  app.innerHTML=`<span class="back" onclick="history.back()">← назад</span>
+  <h1>${esc(s.track)} <span class="tag">${esc(s.type)}</span>${isPB?'<span class="tag pb">новый рекорд трассы</span>':''}</h1>
+  <div class="sub">${fmtD(s.started)}</div>
+  <div class="cards">
+    <div class="card"><div class="k">Лучший круг</div><div class="v p">${fmt(st.best)}</div></div>
+    <div class="card"><div class="k">Идеальный круг</div><div class="v">${fmt(st.ideal)}</div></div>
+    <div class="card"><div class="k">Средний</div><div class="v">${fmt(st.avg)}</div></div>
+    <div class="card"><div class="k">Стабильность σ</div><div class="v">${st.sd?(st.sd/1e3).toFixed(3)+' с':'—'}</div></div>
+    <div class="card"><div class="k">Валидных</div><div class="v">${st.v.length}/${laps.length}</div></div>
+  </div>
+  <h2>Темп по кругам</h2><div class="chart">${lapChart(laps)}</div>
+  <h2>Круги</h2><div class="panel"><table><thead><tr><th>Круг<th>Время<th>Δ к лучшему<th>S1<th>S2<th>S3<th>Шины</tr></thead><tbody>
+  ${laps.map(l=>{const ok=l.valid;const c=(k,b)=>`<td class="${ok&&l[k]&&l[k]===b?'p':(ok&&prev[k==='time_ms'?'best':'b'+k.slice(1)]&&l[k]&&l[k]<prev[k==='time_ms'?'best':'b'+k.slice(1)]?'g':'')}">${k==='time_ms'?fmt(l[k]):fmtS(l[k])}`;
+   return `<tr class="${ok?'':'bad'}"><td>${l.lap}${l.pit?'<span class="tag">pit</span>':''}${ok?'':'<span class="tag inv">недейств.</span>'}`+
+   c('time_ms',st.best)+`<td>${ok&&st.best?(l.time_ms===st.best?'—':'+'+((l.time_ms-st.best)/1e3).toFixed(3)):''}`+c('s1',st.b1)+c('s2',st.b2)+c('s3',st.b3)+`<td>${tyre(l.tyre)} <span style="color:var(--mute)">${l.tyre_age} кр.</span>`}).join('')}
+  </tbody></table></div>
+  <div class="sub" style="margin-top:8px"><span class="p">Фиолетовый</span> — лучшее в сессии, <span class="g">зелёный</span> — быстрее прошлого рекорда на этой трассе.</div>
+  <div class="bar edit" style="margin-top:20px"><button class="danger" id="del">Удалить сессию</button></div>`;
+  $('#del').onclick=async()=>{if(confirm('Удалить сессию и все её круги?')){await fetch('/api/session?uid='+uid,{method:'DELETE'});location.hash='#/sessions'}};
+  await window.sessionRace(s);
+  await window.sessionExtras(s);
+}
+async function tracks(){
+  const tr=await records();
+  app.innerHTML=`<h1>Трассы</h1><div class="sub">Личные рекорды по трассам</div>`+(tr.length?`<div class="grid2">${tr.map(t=>`
+  <div class="tcard" onclick="location.hash='#/track/${enc(t.track)}'"><h3>${esc(t.track)}</h3>
+  <div style="color:var(--mute)">${t.sessions} сесс. · ${t.laps} кругов</div>
+  <div class="big p">${fmt(t.best)}</div>
+  <div class="secs"><span>S1<b>${fmtS(t.b1)}</b></span><span>S2<b>${fmtS(t.b2)}</b></span><span>S3<b>${fmtS(t.b3)}</b></span><span>Идеал<b>${fmt(t.ideal)}</b></span></div></div>`).join('')}</div>`:'<div class="empty">Нет данных</div>');
+}
+async function track(name){
+  const [ss,laps]=await Promise.all([api('/api/sessions'),api('/api/track_laps?track='+enc(name))]);
+  const st=stats(laps);
+  const prog=ss.filter(s=>s.track===name&&s.best).reverse().map(s=>({label:fmtD(s.started)+' '+s.type,t:s.best}));
+  const top=[...st.v].sort((a,b)=>a.time_ms-b.time_ms).slice(0,10);
+  app.innerHTML=`<span class="back" onclick="history.back()">← назад</span><h1>${esc(name)}</h1><div class="sub">${laps.length} кругов</div>
+  <div class="cards">
+    <div class="card"><div class="k">Рекорд</div><div class="v p">${fmt(st.best)}</div></div>
+    <div class="card"><div class="k">Идеальный</div><div class="v">${fmt(st.ideal)}</div></div>
+    <div class="card"><div class="k">Лучший S1</div><div class="v">${fmtS(st.b1)}</div></div>
+    <div class="card"><div class="k">Лучший S2</div><div class="v">${fmtS(st.b2)}</div></div>
+    <div class="card"><div class="k">Лучший S3</div><div class="v">${fmtS(st.b3)}</div></div>
+  </div>
+  <h2>Прогресс (лучший круг по сессиям)</h2><div class="chart">${progressChart(prog)||'<div class="empty">Мало данных</div>'}</div>
+  <h2>Топ-10 кругов</h2><div class="panel"><table><thead><tr><th>#<th>Время<th>S1<th>S2<th>S3<th>Шины<th>Сессия</tr></thead><tbody>
+  ${top.map((l,i)=>`<tr class="click" onclick="location.hash='#/session/${l.uid}'"><td>${i+1}<td class="${i?'':'p'}">${fmt(l.time_ms)}<td>${fmtS(l.s1)}<td>${fmtS(l.s2)}<td>${fmtS(l.s3)}<td>${tyre(l.tyre)}<td>${fmtD(l.started)} ${esc(l.type)}`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- роутер и live ---------- */
+async function route(){
+  const [_,r,arg]=location.hash.split('/'), a=arg?decodeURIComponent(arg):'';
+  const page=({session:'sessions',track:'tracks',season:'seasons',new:'seasons'}[r])||r||'home';
+  document.querySelectorAll('nav a').forEach(x=>x.classList.toggle('on',x.dataset.r===page));
+  try{await ({'':home,sessions,session:()=>session(a),tracks,track:()=>track(a),...window.extraRoutes(a)}[r||'']||home)()}
+  catch(e){app.innerHTML='<div class="empty">Ошибка загрузки: '+esc(e)+'</div>'}
+}
+async function live(){
+  try{const [d]=await api('/api/live');
+    if(STATIC){$('#live').innerHTML=`Только просмотр<br>Обновлено ${fmtD(d.published)}`;return}
+    $('#live').innerHTML=d.active?`<span class="dot on"></span><b style="color:var(--text)">Идёт запись</b><br>${esc(d.track)} · ${esc(d.type)}<br>Круг ${d.lap} · ${tyre(d.tyre)}`
+      :`<span class="dot"></span>Ожидание данных<br>Включи телеметрию в игре`;
+    if(d.active&&(location.hash===''||location.hash==='#/')&&!live.last||live.last&&d.lap!==live.last.lap&&d.active&&['','#/','#/sessions'].includes(location.hash)) route();
+    live.last=d;
+  }catch{}
+}
+addEventListener('hashchange',route);route();live();setInterval(live,2000);
+</script>
+</body>
+</html>
