@@ -2,7 +2,7 @@
    пит-стопы и стинты шин, износ моих шин. Использует глобальные хелперы из index.html. */
 const VIS={16:'Soft',17:'Medium',18:'Hard',7:'Inter',8:'Wet'};
 const LINE_COLORS=['#4aa8ff','#2fd67b','#ffd23f','#ff9f43','#00d2d3','#ff7bd5','#c8d6e5','#a3e635'];
-let cmpA=null,cmpB=null,cmpUid=null;
+let cmpA=null,cmpB=null,cmpUid=null,wearA=null,wearB=null;
 
 /* универсальный линейный график: series=[{name,color,width,points:[[x,y],...]}] */
 function lineChart(series,{h=260,yFmt=v=>v,invert=false,yMin=null,yMax=null,xLabel=x=>x}={}){
@@ -55,6 +55,11 @@ window.sessionRace=async function(s){
     cmpB=(human||leader||{}).car??null;
   }
 
+  const wearOf={}; (R.car_wear||[]).forEach(w=>(wearOf[w.car]??=[]).push(w));
+  if(me&&!wearOf[me.car]&&R.wear.length) wearOf[me.car]=R.wear;
+  // у игрока с «Your Telemetry: Restricted» игра присылает нули на всех кругах
+  const wearHidden=c=>{const w=wearOf[c]||[];return w.length>1&&w.every(x=>!x.fl&&!x.fr&&!x.rl&&!x.rr)};
+  const lastWear=c=>{const w=wearOf[c];if(!w||wearHidden(c))return w?'скрыт':'—';const l=w[w.length-1];return Math.max(l.fl,l.fr,l.rl,l.rr).toFixed(0)+'%'};
   const box=document.createElement('div'); app.appendChild(box);
   const draw=()=>{
     let html='';
@@ -62,10 +67,10 @@ window.sessionRace=async function(s){
       const bt=top('best'),b1=top('b1'),b2=top('b2'),b3=top('b3');
       const cell=(v,best,f)=>`<td class="${fin(v)&&v===best?'p':''}">${fin(v)?f(v):'—'}`;
       html+=`<h2>Темп всех пилотов <span class="tag">клик по строке — сравнить с ним</span></h2>
-      <div class="panel"><table><thead><tr><th>Поз<th>Пилот<th>Команда<th>Лучший<th>S1<th>S2<th>S3<th>Медиана<th>Кругов<th>Питы<th>Шины</tr></thead><tbody>
+      <div class="panel"><table><thead><tr><th>Поз<th>Пилот<th>Команда<th>Лучший<th>S1<th>S2<th>S3<th>Медиана<th>Кругов<th>Питы<th>Шины<th>Износ</tr></thead><tbody>
       ${R.drivers.map(d=>{const x=S[d.car];return `<tr class="click" data-car="${d.car}" style="${d.me?'background:rgba(180,107,255,.12)':d.car===cmpB?'background:rgba(74,168,255,.12)':''}">
         <td>${d.pos??'—'}<td>${esc(d.name)}${d.me?'<span class="tag pb">я</span>':d.ai?'':'<span class="tag">игрок</span>'}<td>${esc(d.team||'')}
-        ${cell(x.best,bt,fmt)}${cell(x.b1,b1,fmtS)}${cell(x.b2,b2,fmtS)}${cell(x.b3,b3,fmtS)}<td>${x.med?fmt(x.med):'—'}<td>${x.n}<td>${d.pits??x.pits}<td>${chips(d.car)}`}).join('')}
+        ${cell(x.best,bt,fmt)}${cell(x.b1,b1,fmtS)}${cell(x.b2,b2,fmtS)}${cell(x.b3,b3,fmtS)}<td>${x.med?fmt(x.med):'—'}<td>${x.n}<td>${d.pits??x.pits}<td>${chips(d.car)}<td title="Самая изношенная шина на последнем круге">${lastWear(d.car)}`}).join('')}
       </tbody></table></div>`;
 
       // сравнение двух пилотов по кругам
@@ -113,21 +118,35 @@ window.sessionRace=async function(s){
       </tbody></table></div>`:''}`;
     }
 
-    // износ моих шин
-    if(R.wear.length){
-      const W=R.wear, last=W[W.length-1], tyres=[['fl','Перед. левая','#ff9f43'],['fr','Перед. правая','#ffd23f'],['rl','Зад. левая','#4aa8ff'],['rr','Зад. правая','#2fd67b']];
+    // износ шин: любой пилот + сравнение с соперником (у живых игроков может быть скрыт настройкой телеметрии)
+    if(Object.keys(wearOf).length){
+      if(wearA==null||!wearOf[wearA]) wearA=me&&wearOf[me.car]?me.car:+Object.keys(wearOf)[0];
+      if(wearB!=null&&!wearOf[wearB]) wearB=null;
+      const tyres=[['fl','Перед. левая','#ff9f43'],['fr','Перед. правая','#ffd23f'],['rl','Зад. левая','#4aa8ff'],['rr','Зад. правая','#2fd67b']];
+      const W=wearOf[wearA], hidden=wearHidden(wearA), last=W[W.length-1];
       // темп износа: по последнему отрезку без сброса (после пита износ падает)
       let i0=W.length-1; while(i0>0&&W[i0-1].fl<=W[i0].fl+0.5&&W[i0-1].rl<=W[i0].rl+0.5) i0--;
       const seg=W.slice(i0), rate=k=>seg.length>1?(seg[seg.length-1][k]-seg[0][k])/(seg[seg.length-1].lap-seg[0].lap):null;
-      html+=`<h2>Износ шин</h2><div class="cards">${tyres.map(([k,t])=>`<div class="card"><div class="k">${t}</div><div class="v">${last[k].toFixed(0)}%</div>
+      const opts=(cur,none)=>(none?`<option value="">— без сравнения —</option>`:'')+R.drivers.filter(d=>wearOf[d.car]).map(d=>`<option value="${d.car}"${d.car===cur?' selected':''}>${esc(d.name)}${d.me?' (я)':''}${wearHidden(d.car)?' — скрыто':''}</option>`).join('');
+      const avg=w=>(w.fl+w.fr+w.rl+w.rr)/4;
+      const cmp=!hidden&&wearB!=null&&!wearHidden(wearB)?[{name:nm(wearA),color:'#e10600',width:3,dots:true,points:W.map(w=>[w.lap,avg(w)])},
+        {name:nm(wearB),color:'#4aa8ff',width:3,dots:true,points:wearOf[wearB].map(w=>[w.lap,avg(w)])}]:null;
+      html+=`<h2>Износ шин</h2>
+      <div class="bar"><select id="wearA">${opts(wearA)}</select> сравнить с <select id="wearB">${opts(wearB,true)}</select></div>
+      ${hidden?`<div class="empty" style="padding:24px">${esc(nm(wearA))}: износ скрыт — у игрока в настройках телеметрии стоит «Your Telemetry: Restricted»</div>`:`
+      <div class="cards">${tyres.map(([k,t])=>`<div class="card"><div class="k">${t}</div><div class="v">${last[k].toFixed(0)}%</div>
         <div class="sub" style="margin:2px 0 0">${rate(k)!=null?'≈ '+rate(k).toFixed(1)+'% за круг':''}</div></div>`).join('')}</div>
-      <div class="chart" style="margin-top:12px">${lineChart(tyres.map(([k,t,c])=>({name:t,color:c,dots:true,points:W.map(w=>[w.lap,w[k]])})),{yMin:0,yFmt:v=>v.toFixed(0)+'%'})}</div>
-      <div class="panel" style="margin-top:12px"><table><thead><tr><th>Круг<th>ПЛ<th>ПП<th>ЗЛ<th>ЗП<th>Макс.</tr></thead><tbody>
-      ${W.map(w=>`<tr><td>${w.lap}<td>${w.fl}%<td>${w.fr}%<td>${w.rl}%<td>${w.rr}%<td><b>${Math.max(w.fl,w.fr,w.rl,w.rr)}%</b>`).join('')}</tbody></table></div>`;
+      <div class="chart" style="margin-top:12px">${lineChart(tyres.map(([k,t,c])=>({name:t,color:c,dots:true,points:W.map(w=>[w.lap,w[k]])})),{yMin:0,yFmt:v=>v.toFixed(0)+'%'})}</div>`}
+      ${cmp?`<h3 style="margin:18px 0 8px">Средний износ: ${esc(nm(wearA))} против ${esc(nm(wearB))}</h3><div class="chart">${lineChart(cmp,{yMin:0,yFmt:v=>v.toFixed(0)+'%'})}</div>`
+        :wearB!=null&&wearHidden(wearB)?`<div class="sub" style="margin-top:10px">${esc(nm(wearB))}: износ скрыт настройкой телеметрии игрока.</div>`:''}
+      ${hidden?'':`<div class="panel" style="margin-top:12px"><table><thead><tr><th>Круг<th>ПЛ<th>ПП<th>ЗЛ<th>ЗП<th>Макс.${cmp?`<th>Макс. у ${esc(nm(wearB))}`:''}</tr></thead><tbody>
+      ${W.map(w=>{const o=cmp?wearOf[wearB].find(x=>x.lap===w.lap):null;return `<tr><td>${w.lap}<td>${w.fl}%<td>${w.fr}%<td>${w.rl}%<td>${w.rr}%<td><b>${Math.max(w.fl,w.fr,w.rl,w.rr)}%</b>${cmp?`<td>${o?Math.max(o.fl,o.fr,o.rl,o.rr)+'%':'—'}`:''}`}).join('')}</tbody></table></div>`}`;
     }
     box.innerHTML=html;
     const a=box.querySelector('#cmpA'),b=box.querySelector('#cmpB');
     if(a){a.onchange=()=>{cmpA=+a.value;draw()};b.onchange=()=>{cmpB=+b.value;draw()}}
+    const wa=box.querySelector('#wearA'),wb=box.querySelector('#wearB');
+    if(wa){wa.onchange=()=>{wearA=+wa.value;draw()};wb.onchange=()=>{wearB=wb.value===''?null:+wb.value;draw()}}
     box.querySelectorAll('tr[data-car]').forEach(tr=>tr.onclick=()=>{cmpB=+tr.dataset.car;draw();box.querySelector('#cmpA')?.scrollIntoView({behavior:'smooth',block:'center'})});
   };
   draw();
