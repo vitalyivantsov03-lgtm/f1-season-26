@@ -6,7 +6,8 @@ const STATUS_IN={'':3,dnf:4,dsq:5,nc:6,dns:7,ret:7};
 const TRACK_NAMES=['Melbourne','Paul Ricard','Shanghai','Sakhir','Barcelona','Monaco','Montreal','Silverstone','Hockenheim','Hungaroring','Spa','Monza','Singapore','Suzuka','Abu Dhabi','Austin','Interlagos','Spielberg','Sochi','Mexico City','Baku','Zandvoort','Imola','Portimao','Jeddah','Miami','Las Vegas','Lusail','Madrid'];
 const SESSION_TYPES=['Race','Sprint','Race 2','Q1','Q2','Q3','Short Qualifying','Sprint Shootout 1','Practice 1','Practice 2','Practice 3'];
 
-const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
+// на сайте друга (GitHub Pages) трекера нет — правка уходит заявкой в репозиторий (editor.js)
+const post=(u,b)=>STATIC?window.friendEdit(u,b):fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
 const del=u=>fetch(u,{method:'DELETE'});
 const refresh=()=>route();
 
@@ -33,7 +34,7 @@ window.sessionExtras=async function(s){
   const [seasons,res]=await Promise.all([api('/api/seasons'),api('/api/results?uid='+s.uid)]);
   const sel=(id,opts,cur)=>`<select id="${id}">${opts.map(([v,t])=>`<option value="${v}"${String(v)===String(cur??'')?' selected':''}>${esc(t)}</option>`).join('')}</select>`;
   const box=document.createElement('div');
-  box.innerHTML=`<div class="edit"><h2>Режим и зачёт</h2>
+  box.innerHTML=`<div class="edit fe"><h2>Режим и зачёт</h2>
   <div class="bar">
     <label>Режим ${sel('m-mode',Object.entries(MODES),s.mode)}</label>
     <label>Сезон ${sel('m-season',[['','— вне сезона —'],...seasons.map(x=>[x.id,x.name+(x.active?' (текущий)':'')])],s.season_id)}</label>
@@ -43,7 +44,7 @@ window.sessionExtras=async function(s){
   <h2>Итоги сессии ${res.length?'':'<span class="tag">нет данных</span>'}</h2>
   ${res.length?`<div class="panel"><table><thead><tr><th>Поз<th>Пилот<th>Команда<th>Старт в гонке<th>Лучший круг<th>Статус</tr></thead><tbody>
   ${res.map(r=>`<tr class="${r.me?'':''}"><td>${r.pos}<td>${esc(r.name)}${r.ai?'<span class="tag">бот</span>':''}${r.me?'<span class="tag pb">я</span>':''}<td>${esc(r.team)}<td>${startCell(r)}<td>${fmt(r.best_ms)}<td>${STATUS[r.status]||'Финиш'}`).join('')}</tbody></table></div>`:''}
-  <div class="bar edit" style="margin-top:10px"><button id="m-edit">${res.length?'Править итоги':'Ввести итоги вручную'}</button></div>
+  <div class="bar edit fe" style="margin-top:10px"><button id="m-edit">${res.length?'Править итоги':'Ввести итоги вручную'}</button></div>
   <div id="m-editor"></div>`;
   box.dataset.tab='overview';
   app.appendChild(box);
@@ -239,7 +240,7 @@ async function seasonPage(id){
   <div class="bar" style="margin-top:12px">${chips.map(([c,t])=>`<span class="chip ${c}">${esc(t)}</span>`).join('')}</div>
   <div class="bar" style="margin-top:6px">${S.active?'<span class="chip blue">Текущий сезон</span>':''}<span class="chip blue">${d.drivers.filter(x=>!x.ai).length} игрока · ${d.drivers.length} пилотов</span>
     <button class="ghost edit" id="s-set">${sSettings?'Скрыть настройки':'Настройки сезона'}</button>
-    <button class="ghost edit" onclick="location.hash='#/new/${S.id}'">+ Добавить сессию вручную</button></div>
+    <button class="ghost edit fe" onclick="location.hash='#/new/${S.id}'">+ Добавить сессию вручную</button></div>
   ${edit}
   <div class="lg-box"><div class="lg-title"><b>${esc(S.name)}</b><span>${planned?`Этап ${Math.min(done+1,planned)} из ${planned}`:`${R.length} этапов`}</span></div>
   <div class="lg-in">
@@ -305,7 +306,8 @@ async function newSessionPage(seasonId){
     const track=$('#n-track').value.trim(); if(!track){alert('Укажите трассу');return}
     const r=await post('/api/manual_session',{track,type:$('#n-type').value,date:$('#n-date').value,total_laps:+$('#n-laps').value||0,
       season_id:$('#n-season').value?+$('#n-season').value:null,results:parseResults($('#n-text').value)});
-    location.hash='#/session/'+r.uid;
+    if(r.error) return;
+    location.hash=r.uid?'#/session/'+r.uid:'#/edits';  // с сайта друга сессия появится после применения правки
   };
 }
 
@@ -324,11 +326,11 @@ async function weekendBlock(s){
   const el=document.createElement('div');
   el.innerHTML=`<div class="bar" style="margin:4px 0 18px">
     ${mates.length?`<a href="#/weekend/${enc(s.weekend)}" class="chip blue" style="text-decoration:none">Уикенд: ${[s,...mates].sort((a,b)=>a.started-b.started).map(x=>esc(qLabel(x.type))).join(' · ')} ›</a>
-      <button class="danger edit" id="wk-out">Отделить от уикенда</button>`:''}
-    ${cands.length?`<span class="edit" style="display:inline-flex;gap:8px;align-items:center"><select id="wk-to">${cands.map(x=>`<option value="${x.uid}">${fmtD(x.started)} · ${esc(qLabel(x.type))}${hasWeekend(x)&&all.filter(y=>y.weekend===x.weekend).length>1?' (уикенд)':''}</option>`).join('')}</select>
+      <button class="danger edit fe" id="wk-out">Отделить от уикенда</button>`:''}
+    ${cands.length?`<span class="edit fe" style="display:inline-flex;gap:8px;align-items:center"><select id="wk-to">${cands.map(x=>`<option value="${x.uid}">${fmtD(x.started)} · ${esc(qLabel(x.type))}${hasWeekend(x)&&all.filter(y=>y.weekend===x.weekend).length>1?' (уикенд)':''}</option>`).join('')}</select>
       <button class="ghost" id="wk-join">${mates.length?'Добавить ещё':'Объединить в уикенд'}</button></span>`:''}</div>`;
   const anchor=app.querySelector('.sub'); anchor?anchor.after(el):app.prepend(el);
-  const j=el.querySelector('#wk-join');if(j)j.onclick=async()=>{const r=await post('/api/weekend_join',{uid:s.uid,target:el.querySelector('#wk-to').value});location.hash='#/weekend/'+enc(r.weekend)};
+  const j=el.querySelector('#wk-join');if(j)j.onclick=async()=>{const r=await post('/api/weekend_join',{uid:s.uid,target:el.querySelector('#wk-to').value});if(r.weekend)location.hash='#/weekend/'+enc(r.weekend)};
   const o=el.querySelector('#wk-out');if(o)o.onclick=async()=>{if(confirm('Отделить эту сессию от уикенда?')){await post('/api/weekend_join',{uid:s.uid,target:null});refresh()}};
 }
 
@@ -378,4 +380,4 @@ async function weekendPage(key){
   ${resultTable(race,'Гонка')}`;
 }
 
-window.extraRoutes=a=>({weekend:()=>weekendPage(a),sessions:sessionsPage,seasons:seasonsPage,season:()=>seasonPage(a),new:()=>newSessionPage(a)});
+window.extraRoutes=a=>({edits:()=>window.editsPage(),weekend:()=>weekendPage(a),sessions:sessionsPage,seasons:seasonsPage,season:()=>seasonPage(a),new:()=>newSessionPage(a)});
