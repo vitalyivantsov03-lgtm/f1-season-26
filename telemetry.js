@@ -7,7 +7,9 @@ const TW=1100,TL=56,TR=14;               // ширина графиков и о�
 let tv=null;                             // то, что сейчас нарисовано: сетки А/Б, границы, проекция карты
 
 const teleKey=t=>t.car+':'+t.lap;
+// на сайте друга все круги сессии лежат одним файлом (tracepack), у трекера — запрос на круг
 const getTrace=(uid,key)=>{const [car,lap]=key.split(':');
+  if(STATIC) return (traceCache[uid+'/pack']??=api(`/api/tracepack?uid=${enc(uid)}`)).then(p=>p[key]||{});
   return traceCache[uid+'/'+key]??=api(`/api/trace?uid=${enc(uid)}&car=${car}&lap=${lap}`)};
 
 /* значение трассы в точке d (линейно; передача — ступенькой) */
